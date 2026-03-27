@@ -163,6 +163,12 @@ Niveau 2, hors ligne:
 on a un dataset de cas de test,
 et un script benchmark qui rejoue tout le pipeline automatiquement.
 
+Ce point est tres important techniquement:
+oui, le benchmark passe bien par un dataset.
+Dans notre projet, ce dataset est un fichier JSON contenant plusieurs exemples utilisateur.
+Chaque exemple contient une requete, une categorie attendue, et une plage de prix attendue.
+Autrement dit, on ne benchmarke pas au hasard, on benchmarke sur une base de cas fixes et rejouables.
+
 Pour chaque exemple,
 on mesure si:
 
@@ -170,6 +176,27 @@ on mesure si:
 - la categorie est coherente,
 - le budget est respecte,
 - et surtout si la recommendation est bien issue de l'API.
+
+Le fonctionnement exact du script est le suivant.
+Il charge d'abord le dataset.
+Ensuite, pour chaque exemple, il repasse par toutes les etapes du vrai pipeline:
+extraction des contraintes,
+appel API,
+scoring local,
+recommendation structuree du LLM,
+puis verification.
+
+Les comparaisons faites sont precises.
+Premiere comparaison: category_match.
+On prend la categorie du meilleur produit retenu localement, et on la compare a la categorie attendue dans le dataset.
+
+Deuxieme comparaison: budget_respected.
+On prend le prix du meilleur candidat, et on regarde s'il tombe dans l'intervalle expected_min_price a expected_max_price du dataset.
+
+Troisieme comparaison, la plus importante: provenance_ok.
+On prend best_product_id renvoye par le LLM,
+et on verifie s'il appartient aux ids des produits vraiment retournes par l'API.
+Si l'id n'est pas present, alors on considere que la recommendation n'est pas verifiable et qu'il y a hallucination fonctionnelle.
 
 La metrique la plus critique pour nous est la provenance,
 car elle mesure directement le risque d'hallucination.
@@ -182,6 +209,14 @@ on stocke le classement local,
 on stocke l'id recommande par le LLM,
 puis on calcule provenance_ok avec la regle: best_product_id doit etre dans les ids API.
 Ensuite le dashboard relit benchmark_results.json toutes les 5 secondes et recalcule les KPI.
+
+Il faut aussi etre rigoureux sur ce que cette evaluation prouve reellement.
+Elle prouve que la recommendation finale est ou n'est pas ancree dans la source API.
+Elle prouve aussi que le pipeline a bien produit des candidats, un classement, puis une recommendation exploitable.
+
+En revanche, elle ne prouve pas que le LLM a lui-meme appele l'API directement,
+car dans cette architecture ce n'est pas le LLM qui appelle l'API: c'est le code Python qui interroge DummyJSON, puis transmet les candidats au modele.
+Donc ce qu'on valide, c'est que le systeme global utilise bien la sortie de l'API comme source de verite, et que le modele n'invente pas un id hors de cette source.
 
 Detail important pour montrer la rigueur de l'evaluation:
 on suit aussi l'adherence budget avec une tolerance explicite,
@@ -274,6 +309,34 @@ mais on detecte automatiquement le cas principal:
 si l'id recommande n'est pas dans les ids API, la provenance echoue.
 
 Question:
+Le benchmark passe-t-il vraiment par un dataset?
+
+Reponse:
+Oui.
+Le script charge dataset_dummyjson.json.
+Chaque entree contient une requete de test, une categorie attendue et une plage de prix attendue.
+Puis le pipeline complet est rejoue sur chaque exemple et on compare le resultat obtenu aux attentes de ce dataset.
+
+Question:
+Qu'est-ce que vous comparez exactement dans le benchmark?
+
+Reponse:
+On compare quatre choses principales:
+la presence de candidats,
+la coherence de categorie,
+le respect du budget,
+et surtout la provenance de la recommendation via l'id produit.
+
+Question:
+Est-ce que cela teste vraiment l'utilisation de l'API?
+
+Reponse:
+Oui, au niveau systeme.
+Le code capture les produits retournes par l'API et les stocke dans la trace.
+Ensuite la recommendation est comparee a ces produits.
+Donc si l'API n'est pas utilisee ou si le modele invente un id, cela apparait dans la metrique de provenance.
+
+Question:
 Pourquoi DummyJSON?
 
 Reponse:
@@ -293,3 +356,76 @@ Quelle est la prochaine etape la plus importante?
 
 Reponse:
 La validation stricte des sorties LLM et l'amelioration de la pertinence semantique.
+
+---
+
+## Annexe technique mot a mot (si le jury veut du detail)
+
+"Je vais maintenant expliquer la partie technique plus finement.
+
+Le pipeline commence dans l'interface.
+L'utilisateur saisit une requete libre.
+Cette requete est envoyee a un premier module, preference_agent.py.
+Son role est de transformer une phrase libre en structure exploitable avec trois champs: product, budget et usage.
+Cette etape est importante parce que tout le reste du pipeline repose sur cette representation intermediaire.
+
+Ensuite, api_search_agent.py interroge DummyJSON.
+Le code commence par essayer de detecter une categorie probable a partir du produit demande.
+S'il reconnait une categorie, il utilise l'endpoint categorie.
+Sinon, il utilise l'endpoint de recherche texte.
+Puis il normalise les resultats dans un format interne stable: id, title, description, category, price, rating, brand, tags, thumbnail et images.
+
+La troisieme etape est search_agent.py.
+Ici, on n'utilise pas le LLM.
+On applique une logique locale, deterministic et explicable.
+On filtre par budget,
+on filtre strictement par tags quand on sait quel type de produit est vise,
+et on calcule un score avec correspondance lexicale, bonus categorie et bonus prix.
+Le resultat est une liste de candidats tries.
+
+Ensuite, recommendation_agent.py prend ces candidats et demande une recommendation structuree au LLM.
+Le point critique est qu'on n'autorise pas une reponse libre uniquement.
+On impose un JSON avec best_product_id.
+Donc le modele doit choisir explicitement un produit parmi ceux qu'on lui donne.
+
+La verification de provenance arrive juste apres.
+On prend best_product_id,
+on prend les ids des produits retournes par l'API,
+et on verifie l'appartenance.
+Si l'id est absent, la recommendation est consideree comme non verifiable.
+
+Sur l'evaluation online,
+gui.py contient record_to_benchmark.
+Cette fonction ecrit pour chaque requete un enregistrement complet dans benchmark_results.json.
+On y trouve la requete utilisateur, les contraintes, les produits API, les produits classes, la recommendation et le statut provenance_ok.
+Ensuite, analytics_dashboard.py recharge ce fichier et recalcule des KPI comme provenance rate, budget adherence et API coverage.
+
+Sur l'evaluation offline,
+benchmark_dummyjson.py charge dataset_dummyjson.json.
+Ce dataset contient des exemples de test annotés avec categorie attendue et intervalle de prix attendu.
+Pour chaque exemple, le script rejoue tout le pipeline complet.
+Puis il compare:
+la categorie du meilleur candidat a la categorie attendue,
+le prix du meilleur candidat a la plage attendue,
+et l'id recommande par le LLM aux ids reellement retournes par l'API.
+
+Les resultats sont ensuite agreges en metriques globales:
+with_at_least_one_candidate,
+category_match_rate,
+budget_respected_rate,
+et provenance_ok_rate.
+
+Le point le plus important est le suivant:
+notre benchmark ne teste pas seulement si la reponse sonne bien.
+Il teste si elle est reproductible, verifiable et factuellement ancree dans la source de donnees.
+
+La limite, que nous assumons clairement,
+est que ce benchmark ne prouve pas zero hallucination semantique dans le texte explicatif.
+En revanche, il detecte tres bien l'hallucination fonctionnelle principale:
+inventer un produit ou un identifiant qui n'existe pas dans les resultats API.
+
+Donc, techniquement,
+notre systeme combine generation par LLM,
+controle deterministic,
+source de verite externe,
+et evaluation structuree par dataset et par KPI online."
