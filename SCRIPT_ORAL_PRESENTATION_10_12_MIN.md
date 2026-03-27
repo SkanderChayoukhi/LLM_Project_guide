@@ -429,3 +429,92 @@ notre systeme combine generation par LLM,
 controle deterministic,
 source de verite externe,
 et evaluation structuree par dataset et par KPI online."
+
+---
+
+## Ma partie seule, mot a mot
+
+"Je vais presenter ma partie en me concentrant sur trois questions: quelles connaissances du cours on a appliquees, quels outils supplementaires on a utilises, et surtout comment on evalue techniquement le systeme.
+
+D'abord, sur les connaissances du cours appliquees.
+Le premier point, c'est la decomposition agentique.
+On n'a pas construit un seul bloc LLM qui ferait tout d'un coup.
+On a decoupe le systeme en modules specialises: un module pour extraire les contraintes depuis la requete utilisateur, un module pour appeler l'API DummyJSON, un module pour filtrer et scorer les produits, un module pour produire la recommendation finale, et enfin des modules pour enregistrer et evaluer les resultats.
+Cette decomposition est importante parce qu'elle rend le pipeline beaucoup plus lisible, plus testable, et plus facile a debugger.
+
+Le deuxieme point, c'est le prompt engineering structure.
+Le LLM ne renvoie pas seulement du texte libre.
+Pour l'extraction des contraintes, on lui impose un JSON avec trois champs: product, budget et usage.
+Pour la recommendation finale, on lui impose aussi un JSON structure contenant notamment best_product_id.
+Ce choix est fondamental, parce qu'une sortie structuree permet ensuite des controles automatiques, notamment pour verifier la provenance.
+
+Le troisieme point, c'est le grounding factuel.
+Le modele ne doit pas inventer un produit de son cote.
+Le systeme va d'abord chercher de vrais produits via l'API DummyJSON, puis il force le LLM a choisir parmi ces produits.
+Ensuite, on verifie si l'identifiant du produit recommande appartient bien aux identifiants reellement retournes par l'API.
+Donc la recommendation est ancree dans une source externe, et pas seulement dans la generation du modele.
+
+Le quatrieme point, c'est l'approche hybride entre deterministic et generatif.
+La partie deterministic est utilisee pour tout ce qui doit etre controle et explicable: filtres budget, filtrage par tags, et score local.
+La partie generative est utilisee la ou le LLM apporte une vraie valeur: comprendre une requete naturelle et formuler une explication finale.
+Autrement dit, on ne laisse pas le modele gerer seul toute la logique metier.
+
+Le cinquieme point, c'est l'evaluation continue.
+On ne se contente pas d'une impression qualitative du style: la reponse a l'air bien.
+Chaque execution du pipeline est tracee, stockee, puis transformee en indicateurs de qualite.
+
+Maintenant, sur les outils non couverts par le cours.
+On a utilise Gradio pour construire l'interface utilisateur et le dashboard analytics.
+On a utilise DummyJSON comme source publique de catalogue produit.
+On a utilise matplotlib pour visualiser les tendances des metriques dans le temps.
+Et on a mis en place une journalisation JSON custom pour conserver une trace complete de chaque execution.
+Ces outils ne remplacent pas les concepts du cours.
+Ils permettent plutot de les rendre operationnels, demonstrables et auditables dans une vraie demo de bout en bout.
+
+J'arrive maintenant au point le plus important: l'evaluation du systeme.
+Techniquement, notre evaluation se fait sur deux boucles complementaires: une boucle online et une boucle offline.
+
+La boucle online correspond au fonctionnement en direct de l'application.
+A chaque fois qu'un utilisateur soumet une requete, le systeme enregistre dans benchmark_results.json la requete utilisateur, les contraintes extraites, les produits retournes par l'API, les produits classes apres scoring, la recommendation finale, et le statut provenance_ok.
+Ensuite, le dashboard recharge ce fichier periodiquement et recalcule des KPI comme provenance rate, budget adherence, API coverage et total queries.
+
+La boucle offline correspond au vrai benchmark sur dataset.
+Oui, ici le benchmark passe bien par un dataset.
+Dans ce projet, le dataset est un fichier JSON qui contient plusieurs exemples de test.
+Chaque exemple contient une requete utilisateur, une categorie attendue, et une plage de prix attendue.
+L'idee est de rejouer systematiquement le pipeline complet sur des cas connus, afin de mesurer la qualite de maniere reproductible.
+
+Le script benchmark_dummyjson.py fonctionne de la facon suivante.
+Il charge d'abord le dataset.
+Puis, pour chaque exemple, il relance exactement les memes etapes que dans le vrai systeme: extraction des contraintes, appel de l'API DummyJSON, scoring local, recommendation structuree du LLM, puis verification finale.
+
+Ensuite, il fait plusieurs comparaisons.
+Premiere comparaison: est-ce qu'on a au moins un candidat apres recherche et filtrage.
+Deuxieme comparaison: est-ce que la categorie du meilleur candidat correspond a la categorie attendue dans le dataset.
+Troisieme comparaison: est-ce que le prix du meilleur candidat est compris dans l'intervalle attendu du dataset.
+Quatrieme comparaison, et la plus importante: est-ce que l'identifiant recommande par le LLM appartient aux identifiants des produits reellement retournes par l'API.
+
+Cette derniere verification correspond a la metrique provenance_ok.
+La regle est simple: provenance_ok vaut vrai si best_product_id est dans api_ids.
+Sinon, on considere que la recommendation n'est pas verifiable et qu'il y a hallucination fonctionnelle.
+
+Il faut etre tres precis sur ce que cette evaluation prouve et sur ce qu'elle ne prouve pas.
+Elle prouve que la recommendation finale est bien, ou non, ancree dans la source API.
+Elle prouve aussi que le pipeline est capable de produire des candidats, un classement et une recommendation mesurable.
+En revanche, elle ne prouve pas mathematiquement zero hallucination semantique dans le texte explicatif du LLM.
+Et elle ne prouve pas que le LLM a lui-meme appele l'API, parce que dans cette architecture c'est le code Python qui interroge DummyJSON, puis transmet les candidats au modele.
+Donc ce qu'on valide reellement, c'est que le systeme global utilise bien l'API comme source de verite et que le modele n'invente pas un identifiant hors de cette source.
+
+Si je relie maintenant cette evaluation au code,
+preference_agent.py extrait les contraintes,
+api_search_agent.py construit la source de verite externe,
+search_agent.py applique le filtrage et le scoring deterministes,
+recommendation_agent.py force une recommendation structuree avec un identifiant produit,
+gui.py enregistre toute la trace online,
+analytics_dashboard.py transforme cette trace en KPI,
+et benchmark_dummyjson.py rejoue le pipeline sur le dataset pour calculer les metriques offline.
+
+Donc, pour conclure ma partie,
+notre systeme ne se contente pas de produire une recommendation plausible.
+Il produit une recommendation que l'on peut auditer, verifier et mesurer.
+Et c'est cette combinaison entre generation, controle deterministic, source de verite externe et evaluation structuree qui fait la solidite technique du projet."
