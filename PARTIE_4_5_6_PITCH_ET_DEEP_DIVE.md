@@ -426,7 +426,7 @@ On a deux boucles.
 
 Premiere boucle, online:
 a chaque requete, on stocke contraintes, produits API, ranking, recommendation et statut de provenance.
-Le dashboard relit ces traces toutes les 5 secondes et recalcule les KPI.
+Le dashboard relit ces traces toutes les 5 secondes et recalcule plusieurs KPI, notamment provenance rate, budget adherence, API coverage et total queries.
 
 Deuxieme boucle, offline:
 on rejoue un dataset fixe,
@@ -456,6 +456,10 @@ Quatrieme comparaison, la plus importante: est-ce que l'identifiant recommande p
 La metrique cle est provenance_ok.
 La regle est simple: l'ID recommande doit etre present dans les IDs retournes par l'API.
 Si ce n'est pas le cas, on detecte une recommendation non verifiable.
+
+On suit aussi l'adherence budget avec une regle explicite dans le suivi online:
+le prix recommande doit rester inferieur ou egal a budget multiplie par 1,3.
+Cette tolerance evite d'etre trop rigide tout en gardant une borne de controle claire.
 
 Autrement dit, on teste bien que le systeme s'appuie sur la source API comme source de verite,
 et qu'il n'invente pas un produit hors de cette source.
