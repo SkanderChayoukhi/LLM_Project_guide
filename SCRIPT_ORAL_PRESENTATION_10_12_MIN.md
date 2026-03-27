@@ -98,27 +98,27 @@ Ce decoupage nous a permis de separer clairement:
 
 ## 4:30 a 6:15 Which knowledge from the course did you apply?
 
-On a applique plusieurs notions vues dans le cours.
+Sur la partie connaissances du cours, on a applique cinq points de facon tres concrete.
 
 Premier point: decomposition agentique.
-On n'a pas construit un bloc monolithique,
-mais une chaine d'agents specialises.
+On a separe le systeme en modules specialises: extraction, recherche API, scoring, recommendation et evaluation.
+Cette separation suit directement la logique vue en cours: un role clair par agent pour eviter les boites noires.
 
 Deuxieme point: prompt engineering structure.
-Par exemple pour l'extraction,
-on impose une sortie JSON precise avec des cles connues.
+On n'a pas demande des reponses libres au LLM.
+On impose du JSON avec des cles connues, ce qui permet un traitement automatique fiable.
 
-Troisieme point: grounding et controle de verite.
-La recommendation n'est pas acceptee aveuglement,
-elle est verifiee contre une source externe, ici DummyJSON.
+Troisieme point: grounding factuel.
+La recommendation finale est confrontee a une source de verite externe.
+Concretement, on verifie que l'id recommande existe dans les resultats API.
 
-Quatrieme point: evaluation.
-On a integre des metriques et un suivi continu,
-au lieu de s'arreter a une demo qualitative.
+Quatrieme point: hybridation deterministic + generatif.
+Le tri et les filtres sont locaux et explicables,
+et le LLM est utilise pour la comprehension du besoin et l'explication utilisateur.
 
-Cinquieme point: observabilite.
-Chaque requete est tracee,
-ce qui permet d'auditer les decisions du systeme.
+Cinquieme point: evaluation continue.
+Chaque execution est tracee, puis exposee dans des KPI.
+Donc on ne juge pas la solution a l'intuition, mais sur des indicateurs mesurables.
 
 ---
 
@@ -131,8 +131,15 @@ Oui, on a utilise plusieurs outils complementaires:
 - matplotlib pour visualiser les tendances,
 - un mecanisme custom de benchmark temps reel.
 
-Donc le coeur conceptuel vient du cours,
-mais on l'a outille avec des briques pratiques pour avoir un systeme demonstrable de bout en bout.
+Le point important a retenir, c'est que ces outils ne remplacent pas le cours,
+ils operationalisent les concepts du cours dans un systeme demoable et testable.
+
+Par exemple:
+
+- Gradio nous donne la couche interaction et observabilite,
+- DummyJSON fournit une source de verite reproductible,
+- matplotlib rend lisible l'evolution de la qualite,
+- le logging JSON rend possible l'audit et le benchmark.
 
 ---
 
@@ -175,6 +182,18 @@ on stocke le classement local,
 on stocke l'id recommande par le LLM,
 puis on calcule provenance_ok avec la regle: best_product_id doit etre dans les ids API.
 Ensuite le dashboard relit benchmark_results.json toutes les 5 secondes et recalcule les KPI.
+
+Detail important pour montrer la rigueur de l'evaluation:
+on suit aussi l'adherence budget avec une tolerance explicite,
+prix recommande <= budget \* 1.3,
+ce qui evite d'eliminer trop agressivement des produits proches du budget.
+
+Donc, au final, l'evaluation combine:
+
+- robustesse factuelle (provenance),
+- adequation economique (budget),
+- disponibilite donnees (API coverage),
+- et tendance temporelle (dashboard).
 
 ---
 
