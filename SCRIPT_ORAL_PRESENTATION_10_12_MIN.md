@@ -167,6 +167,15 @@ on mesure si:
 La metrique la plus critique pour nous est la provenance,
 car elle mesure directement le risque d'hallucination.
 
+Micro-explication du flux benchmark en 30 secondes:
+on prend une requete utilisateur,
+on stocke les contraintes extraites,
+on stocke les produits retournes par l'API,
+on stocke le classement local,
+on stocke l'id recommande par le LLM,
+puis on calcule provenance_ok avec la regle: best_product_id doit etre dans les ids API.
+Ensuite le dashboard relit benchmark_results.json toutes les 5 secondes et recalcule les KPI.
+
 ---
 
 ## 9:15 a 10:30 Limites et ameliorations
