@@ -1,431 +1,464 @@
-# Script Oral Pret a Presenter (10-12 minutes)
+# Partie 4-5-6: Pitch + Deep Dive Technique
 
-## Objectif
+## Objectif du document
 
-Ce script est ecrit pour etre lu tel quel a l'oral.
-Tu peux le dire mot a mot ou l'adapter legerement.
-Le contenu repond exactement aux 5 questions demandees.
+Ce document est fait pour TA partie de presentation:
 
----
+- 4. Connaissances du cours appliquees
+- 5. Outils non couverts par le cours
+- 6. Comment la solution s'evalue
 
-## Plan rapide de prise de parole
+Tu as 3 niveaux d'usage:
 
-- 0:00 a 0:45 Introduction
-- 0:45 a 2:15 Question 1: probleme a resoudre
-- 2:15 a 4:30 Question 2: structure de la solution
-- 4:30 a 6:15 Question 3: connaissances du cours appliquees
-- 6:15 a 7:15 Question 4: ressources hors cours
-- 7:15 a 9:15 Question 5: evaluation de la solution
-- 9:15 a 10:30 limites et ameliorations
-- 10:30 a 11:30 conclusion
-- 11:30 a 12:00 transition Q and A
+1. Version orale simple (si stress)
+2. Version technique (si jury creuse)
+3. Mapping direct vers le code (pour prouver)
 
 ---
 
-## Script complet a lire
+## A) Pitch oral pret a dire (environ 4 min)
 
-## 0:00 a 0:45 Introduction
+### A1. Connaissances du cours appliquees (1 min 30)
 
-Bonjour a tous.
-Aujourd'hui je vous presente notre projet de shopping assistant multi-agent base sur un LLM.
-L'idee est de partir d'une phrase libre utilisateur, de trouver des produits reels via API, de classer les options, puis de produire une recommandation qui reste verifiable et non hallucinee.
-Notre fil conducteur pendant tout le projet a ete: utilite pour l'utilisateur, mais aussi fiabilite mesurable.
+Sur cette partie, on a applique les concepts du cours de facon tres operationnelle.
 
----
+Premier concept: decomposition agentique.
+On a decoupe la solution en blocs specialises: extraction, recherche API, scoring, recommendation et evaluation.
+Ce choix rend le systeme plus lisible et plus facile a debugger qu'un agent unique qui ferait tout.
 
-## 0:45 a 2:15 Which problem did you try to solve?
+Deuxieme concept: prompt engineering structure.
+On impose des sorties JSON au LLM au lieu de texte libre.
+C'est essentiel pour brancher ensuite des controles automatiques.
 
-Le probleme qu'on a voulu resoudre est simple en apparence, mais difficile en pratique:
-un utilisateur formule son besoin en langage naturel, parfois de facon vague,
-et on doit quand meme lui recommander un produit pertinent et realiste.
+Troisieme concept: grounding factuel.
+On ne fait pas confiance aveuglement au LLM.
+La recommandation est confrontee a la source de verite externe via l'ID produit.
 
-Le risque principal quand on utilise un LLM est l'hallucination:
-le modele peut proposer un produit qui semble credible, mais qui n'existe pas dans la source de donnees.
+Quatrieme concept: approche hybride.
+Le deterministic gere le controle metier et le ranking,
+le generatif gere la comprehension langage naturel et l'explication utilisateur.
 
-Donc notre vrai probleme n'etait pas seulement de recommander,
-mais de recommander de facon traceable et verifiable.
+Cinquieme concept: evaluation continue.
+Chaque interaction est tracee et transformee en KPI.
+On pilote donc la qualite par la mesure.
 
-En resume, on a cherche a repondre a trois exigences en meme temps:
+### A2. Outils hors cours utilises (1 min)
 
-- comprendre correctement l'intention utilisateur,
-- proposer une recommandation de qualite,
-- garantir que la recommendation est ancree dans des donnees reelles.
+On a utilise des outils externes pour operationaliser les concepts:
 
----
+- Gradio pour exposer le systeme et le dashboard en direct.
+- DummyJSON comme catalogue public reproductible.
+- Matplotlib pour les tendances temporelles.
+- Journalisation JSON custom pour garder les traces complete.
 
-## 2:15 a 4:30 How did you structure the solution?
+Ces outils ne changent pas la logique scientifique,
+ils la rendent demonstrable, observable et auditable.
 
-On a structure la solution comme un pipeline multi-agent,
-ou chaque module a une responsabilite claire.
+### A3. Evaluation de la solution (1 min 30)
 
-Etape 1:
-On recoit la requete en texte libre dans l'interface.
+L'evaluation se fait sur deux boucles.
 
-Etape 2:
-Le preference agent extrait des contraintes structurees:
-product, budget et usage.
+Online:
+a chaque requete, on sauvegarde contraintes, resultats API, ranking, recommendation, et provenance.
+Le dashboard lit ensuite ces traces toutes les 5 secondes et recalcule les KPI.
 
-Etape 3:
-Le api search agent interroge DummyJSON,
-soit par endpoint categorie,
-soit par endpoint recherche texte.
+Offline:
+un benchmark rejoue un dataset de requetes fixes,
+calcule des metriques de qualite,
+et exporte un rapport detaille.
 
-Etape 4:
-Le search agent applique une logique locale deterministic:
-filtrage par budget,
-filtrage strict par tags,
-puis scoring de pertinence.
+La metrique cle est provenance_ok.
+Regle simple: l'ID recommande doit appartenir aux IDs retournes par l'API.
+Si ce n'est pas le cas, on signale un risque d'hallucination.
 
-Etape 5:
-Le recommendation agent demande au LLM une sortie JSON structuree,
-avec un best product id choisi uniquement parmi les candidats.
-
-Etape 6:
-On verifie la provenance:
-on controle que best product id appartient bien aux ids retournes par l'API.
-
-Etape 7:
-On enregistre tout dans benchmark results,
-puis le dashboard met a jour les KPI en temps reel.
-
-Ce decoupage nous a permis de separer clairement:
-
-- intelligence linguistique du LLM,
-- logique metier locale explicable,
-- et verification factuelle.
+Conclusion de cette partie:
+notre evaluation n'est pas decorative,
+elle est integree au coeur du pipeline.
 
 ---
 
-## 4:30 a 6:15 Which knowledge from the course did you apply?
+## B) Version technique (si le jury demande des details)
 
-Sur la partie connaissances du cours, on a applique cinq points de facon tres concrete.
+## B1. Connaissances appliquees avec preuves dans le code
 
-Premier point: decomposition agentique.
-On a separe le systeme en modules specialises: extraction, recherche API, scoring, recommendation et evaluation.
-Cette separation suit directement la logique vue en cours: un role clair par agent pour eviter les boites noires.
+1. Decomposition agentique
 
-Deuxieme point: prompt engineering structure.
-On n'a pas demande des reponses libres au LLM.
-On impose du JSON avec des cles connues, ce qui permet un traitement automatique fiable.
+- preference_agent.py: extraction contraintes.
+- api_search_agent.py: acquisition source de verite.
+- search_agent.py: filtres et scoring explicables.
+- recommendation_agent.py: choix final et justification.
+- gui.py + analytics_dashboard.py + benchmark_dummyjson.py: evaluation/observabilite.
 
-Troisieme point: grounding factuel.
-La recommendation finale est confrontee a une source de verite externe.
-Concretement, on verifie que l'id recommande existe dans les resultats API.
+2. Prompt engineering structure
 
-Quatrieme point: hybridation deterministic + generatif.
-Le tri et les filtres sont locaux et explicables,
-et le LLM est utilise pour la comprehension du besoin et l'explication utilisateur.
+- extraction: contrainte JSON a 3 champs.
+- recommendation structuree: JSON avec best_product_id.
 
-Cinquieme point: evaluation continue.
-Chaque execution est tracee, puis exposee dans des KPI.
-Donc on ne juge pas la solution a l'intuition, mais sur des indicateurs mesurables.
+3. Grounding
 
----
+- verification de provenance par appartenance d'ID.
 
-## 6:15 a 7:15 Did you need resources or tools not covered in the course?
+4. Hybridation deterministic/generatif
 
-Oui, on a utilise plusieurs outils complementaires:
+- deterministic: filtres budget/tags/score.
+- generatif: interpretation du besoin et formulation.
 
-- Gradio pour l'interface utilisateur et le dashboard,
-- DummyJSON comme catalogue public de produits,
-- matplotlib pour visualiser les tendances,
-- un mecanisme custom de benchmark temps reel.
+5. Evaluation continue
 
-Le point important a retenir, c'est que ces outils ne remplacent pas le cours,
-ils operationalisent les concepts du cours dans un systeme demoable et testable.
+- ecriture trace par requete,
+- dashboard auto-refresh,
+- benchmark batch dataset.
 
-Par exemple:
+## B2. Outils hors cours et justification technique
 
-- Gradio nous donne la couche interaction et observabilite,
-- DummyJSON fournit une source de verite reproductible,
-- matplotlib rend lisible l'evolution de la qualite,
-- le logging JSON rend possible l'audit et le benchmark.
+1. Gradio
 
----
+- avantage: prototypage rapide, interaction + monitoring sans backend lourd.
 
-## 7:15 a 9:15 How does your solution evaluate?
+2. DummyJSON
 
-Notre evaluation se fait sur deux niveaux.
+- avantage: API publique stable, facilite reproduction des resultats.
 
-Niveau 1, en ligne:
-a chaque requete utilisateur,
-on enregistre contraintes, resultats API, classement local, recommendation finale et statut de provenance.
+3. Matplotlib
 
-Le dashboard calcule ensuite des KPI,
-notamment:
+- avantage: vue tendance, pas seulement snapshot.
 
-- provenance rate,
-- budget adherence,
-- API coverage,
-- total queries.
+4. JSON logging custom
 
-Niveau 2, hors ligne:
-on a un dataset de cas de test,
-et un script benchmark qui rejoue tout le pipeline automatiquement.
+- avantage: audit complet par requete,
+- utile pour debug et post-mortem.
 
-Ce point est tres important techniquement:
-oui, le benchmark passe bien par un dataset.
-Dans notre projet, ce dataset est un fichier JSON contenant plusieurs exemples utilisateur.
-Chaque exemple contient une requete, une categorie attendue, et une plage de prix attendue.
-Autrement dit, on ne benchmarke pas au hasard, on benchmarke sur une base de cas fixes et rejouables.
+## B3. Evaluation: logique exacte des metriques
 
-Pour chaque exemple,
-on mesure si:
+1. provenance_rate
 
-- on a des candidats,
-- la categorie est coherente,
-- le budget est respecte,
-- et surtout si la recommendation est bien issue de l'API.
+- definition: proportion de requetes avec provenance_ok = True.
+- interpretation: robustesse factuelle du systeme.
 
-Le fonctionnement exact du script est le suivant.
-Il charge d'abord le dataset.
-Ensuite, pour chaque exemple, il repasse par toutes les etapes du vrai pipeline:
-extraction des contraintes,
-appel API,
-scoring local,
-recommendation structuree du LLM,
-puis verification.
+2. budget_adherence
 
-Les comparaisons faites sont precises.
-Premiere comparaison: category_match.
-On prend la categorie du meilleur produit retenu localement, et on la compare a la categorie attendue dans le dataset.
+- definition operationnelle: prix recommande <= budget \* 1.3.
+- interpretation: adequation economique, avec tolerance.
 
-Deuxieme comparaison: budget_respected.
-On prend le prix du meilleur candidat, et on regarde s'il tombe dans l'intervalle expected_min_price a expected_max_price du dataset.
+3. api_coverage
 
-Troisieme comparaison, la plus importante: provenance_ok.
-On prend best_product_id renvoye par le LLM,
-et on verifie s'il appartient aux ids des produits vraiment retournes par l'API.
-Si l'id n'est pas present, alors on considere que la recommendation n'est pas verifiable et qu'il y a hallucination fonctionnelle.
+- definition: proportion de requetes qui retournent au moins un produit API.
+- interpretation: capacite du backend de recherche a couvrir les intentions.
 
-La metrique la plus critique pour nous est la provenance,
-car elle mesure directement le risque d'hallucination.
+4. offline metrics
 
-Micro-explication du flux benchmark en 30 secondes:
-on prend une requete utilisateur,
-on stocke les contraintes extraites,
-on stocke les produits retournes par l'API,
-on stocke le classement local,
-on stocke l'id recommande par le LLM,
-puis on calcule provenance_ok avec la regle: best_product_id doit etre dans les ids API.
-Ensuite le dashboard relit benchmark_results.json toutes les 5 secondes et recalcule les KPI.
-
-Il faut aussi etre rigoureux sur ce que cette evaluation prouve reellement.
-Elle prouve que la recommendation finale est ou n'est pas ancree dans la source API.
-Elle prouve aussi que le pipeline a bien produit des candidats, un classement, puis une recommendation exploitable.
-
-En revanche, elle ne prouve pas que le LLM a lui-meme appele l'API directement,
-car dans cette architecture ce n'est pas le LLM qui appelle l'API: c'est le code Python qui interroge DummyJSON, puis transmet les candidats au modele.
-Donc ce qu'on valide, c'est que le systeme global utilise bien la sortie de l'API comme source de verite, et que le modele n'invente pas un id hors de cette source.
-
-Detail important pour montrer la rigueur de l'evaluation:
-on suit aussi l'adherence budget avec une tolerance explicite,
-prix recommande <= budget \* 1.3,
-ce qui evite d'eliminer trop agressivement des produits proches du budget.
-
-Donc, au final, l'evaluation combine:
-
-- robustesse factuelle (provenance),
-- adequation economique (budget),
-- disponibilite donnees (API coverage),
-- et tendance temporelle (dashboard).
+- category_match_rate,
+- budget_respected_rate,
+- provenance_ok_rate,
+- with_at_least_one_candidate.
 
 ---
 
-## 9:15 a 10:30 Limites et ameliorations
+## C) Mapping code a montrer en live (si besoin)
 
-La solution est fonctionnelle, mais on voit deja les limites.
+1. Extraction contrainte
 
-Les limites actuelles:
+- Montrer extract_constraints dans preference_agent.py.
+- Phrase utile: "ici on force un JSON machine-readable".
 
-- scoring base sur heuristiques et mots-cles,
-- mappings statiques,
-- validation JSON LLM encore perfectible,
-- dataset de benchmark encore limite en taille.
+2. Source de verite API
 
-Nos ameliorations prioritaires:
+- Montrer search_products_api dans api_search_agent.py.
+- Phrase utile: "on choisit endpoint categorie ou search selon le besoin".
 
-- validation stricte de schema,
-- reranking semantique avec embeddings,
-- enrichissement des metriques,
-- plus de tests automatiques.
+3. Ranking local
 
----
+- Montrer search_products dans search_agent.py.
+- Phrase utile: "le score est explicable, ce n'est pas une boite noire".
 
-## 10:30 a 11:30 Conclusion
+4. Recommendation structuree
 
-Pour conclure,
-notre contribution principale n'est pas seulement une recommendation produit,
-mais une recommendation verifiable.
+- Montrer build_recommendation_structured dans recommendation_agent.py.
+- Phrase utile: "on exige un best_product_id pour verification automatique".
 
-On combine:
+5. Benchmark online
 
-- la flexibilite du LLM pour comprendre l'utilisateur,
-- la robustesse d'une logique deterministe pour filtrer et scorer,
-- et une verification de provenance qui reduit les hallucinations.
+- Montrer record_to_benchmark dans gui.py.
+- Phrase utile: "chaque requete devient une trace complete".
 
-Ce projet est donc a la fois demonstrable en live,
-et auditable techniquement.
+6. Dashboard KPI
 
----
+- Montrer calculate_metrics et get_trend_data dans analytics_dashboard.py.
+- Phrase utile: "on transforme les traces en indicateurs suivables dans le temps".
 
-## 11:30 a 12:00 Transition questions
+7. Benchmark offline
 
-Merci pour votre attention.
-Si vous voulez, je peux maintenant montrer un exemple en direct,
-puis expliquer en detail une partie precise:
-soit l'extraction des contraintes,
-soit le scoring,
-soit le benchmark et les KPI.
+- Montrer run_benchmark dans benchmark_dummyjson.py.
+- Phrase utile: "on valide la qualite sur un dataset stable et rejouable".
 
 ---
 
-## Mini anti-seche (si tu stresses)
+## D) Reponses courtes aux questions difficiles
 
-Si tu perds le fil, reviens a cette phrase:
-Notre projet transforme une demande libre en recommendation produit,
-avec verification automatique que le produit recommande existe vraiment dans la source API.
+Question: Pourquoi une tolerance budget de 30%?
+Reponse: Pour eviter un filtre trop dur et conserver des candidats proches du budget, tout en gardant une limite explicite.
 
-Puis enchaine avec:
-probleme, architecture, cours applique, outils externes, evaluation.
+Question: Votre evaluation prouve-t-elle zero hallucination?
+Reponse: Non, elle ne prouve pas zero hallucination au sens absolu, mais elle detecte automatiquement le cas critique: recommendation hors source API.
 
----
+Question: Pourquoi ne pas tout faire dans le LLM?
+Reponse: Parce qu'on perdrait la maitrise metrique et la tracabilite. Le deterministic apporte controle et reproductibilite.
 
-## Questions probables du jury et reponses courtes
-
-Question:
-Pourquoi un pipeline multi-agent au lieu d'un seul prompt geant?
-
-Reponse:
-Parce qu'on veut separer ce qui doit etre deterministic de ce qui peut etre generatif.
-Cette separation augmente la lisibilite, la debuggabilite et la fiabilite.
-
-Question:
-Comment prouvez-vous qu'il n'y a pas d'hallucination?
-
-Reponse:
-On ne le prouve pas absoluement,
-mais on detecte automatiquement le cas principal:
-si l'id recommande n'est pas dans les ids API, la provenance echoue.
-
-Question:
-Le benchmark passe-t-il vraiment par un dataset?
-
-Reponse:
-Oui.
-Le script charge dataset_dummyjson.json.
-Chaque entree contient une requete de test, une categorie attendue et une plage de prix attendue.
-Puis le pipeline complet est rejoue sur chaque exemple et on compare le resultat obtenu aux attentes de ce dataset.
-
-Question:
-Qu'est-ce que vous comparez exactement dans le benchmark?
-
-Reponse:
-On compare quatre choses principales:
-la presence de candidats,
-la coherence de categorie,
-le respect du budget,
-et surtout la provenance de la recommendation via l'id produit.
-
-Question:
-Est-ce que cela teste vraiment l'utilisation de l'API?
-
-Reponse:
-Oui, au niveau systeme.
-Le code capture les produits retournes par l'API et les stocke dans la trace.
-Ensuite la recommendation est comparee a ces produits.
-Donc si l'API n'est pas utilisee ou si le modele invente un id, cela apparait dans la metrique de provenance.
-
-Question:
-Pourquoi DummyJSON?
-
-Reponse:
-Pour avoir une source publique simple, stable et reproductible,
-qui permet de tester rapidement le pipeline sans dependre d'un backend prive.
-
-Question:
-Votre score est-il optimal?
-
-Reponse:
-Non, c'est un baseline explicable.
-Il est volontairement simple pour etre interpretable,
-ensuite on peut evoluer vers du reranking semantique.
-
-Question:
-Quelle est la prochaine etape la plus importante?
-
-Reponse:
-La validation stricte des sorties LLM et l'amelioration de la pertinence semantique.
+Question: Qu'est-ce qui est le plus important dans votre architecture?
+Reponse: Le couple grounding + evaluation continue. C'est ce qui transforme une demo LLM en systeme auditable.
 
 ---
 
-## Annexe technique mot a mot (si le jury veut du detail)
+## E) Version 30 secondes (ultra resume)
 
-"Je vais maintenant expliquer la partie technique plus finement.
+On applique les concepts du cours avec une architecture multi-agent,
+un LLM contraint en JSON,
+une verification de verite sur source API,
+et une evaluation continue online et offline.
 
-Le pipeline commence dans l'interface.
-L'utilisateur saisit une requete libre.
-Cette requete est envoyee a un premier module, preference_agent.py.
-Son role est de transformer une phrase libre en structure exploitable avec trois champs: product, budget et usage.
-Cette etape est importante parce que tout le reste du pipeline repose sur cette representation intermediaire.
+Les outils externes (Gradio, DummyJSON, matplotlib) servent a rendre cette logique demonstrable et mesurable.
 
-Ensuite, api_search_agent.py interroge DummyJSON.
-Le code commence par essayer de detecter une categorie probable a partir du produit demande.
-S'il reconnait une categorie, il utilise l'endpoint categorie.
-Sinon, il utilise l'endpoint de recherche texte.
-Puis il normalise les resultats dans un format interne stable: id, title, description, category, price, rating, brand, tags, thumbnail et images.
+Notre point fort: chaque recommendation est tracee, verifiee et convertie en KPI.
 
-La troisieme etape est search_agent.py.
-Ici, on n'utilise pas le LLM.
-On applique une logique locale, deterministic et explicable.
-On filtre par budget,
-on filtre strictement par tags quand on sait quel type de produit est vise,
-et on calcule un score avec correspondance lexicale, bonus categorie et bonus prix.
-Le resultat est une liste de candidats tries.
+---
 
-Ensuite, recommendation_agent.py prend ces candidats et demande une recommendation structuree au LLM.
-Le point critique est qu'on n'autorise pas une reponse libre uniquement.
-On impose un JSON avec best_product_id.
-Donc le modele doit choisir explicitement un produit parmi ceux qu'on lui donne.
+## F) Benchmark explique a fond (niveau debutant total)
 
-La verification de provenance arrive juste apres.
-On prend best_product_id,
-on prend les ids des produits retournes par l'API,
-et on verifie l'appartenance.
-Si l'id est absent, la recommendation est consideree comme non verifiable.
+## F1. Question centrale du benchmark
 
-Sur l'evaluation online,
-gui.py contient record_to_benchmark.
-Cette fonction ecrit pour chaque requete un enregistrement complet dans benchmark_results.json.
-On y trouve la requete utilisateur, les contraintes, les produits API, les produits classes, la recommendation et le statut provenance_ok.
-Ensuite, analytics_dashboard.py recharge ce fichier et recalcule des KPI comme provenance rate, budget adherence et API coverage.
+Le benchmark sert a repondre a 3 questions critiques:
 
-Sur l'evaluation offline,
-benchmark_dummyjson.py charge dataset_dummyjson.json.
-Ce dataset contient des exemples de test annotés avec categorie attendue et intervalle de prix attendu.
-Pour chaque exemple, le script rejoue tout le pipeline complet.
-Puis il compare:
-la categorie du meilleur candidat a la categorie attendue,
-le prix du meilleur candidat a la plage attendue,
-et l'id recommande par le LLM aux ids reellement retournes par l'API.
+1. Est-ce que la recommendation finale est basee sur de vrais produits API?
+2. Est-ce que la recommendation respecte globalement le budget/categorie?
+3. Est-ce qu'on peut mesurer ces points de facon reproductible?
 
-Les resultats sont ensuite agreges en metriques globales:
-with_at_least_one_candidate,
-category_match_rate,
-budget_respected_rate,
-et provenance_ok_rate.
+En clair: le benchmark transforme une demo "ca a l'air bien" en preuve mesurable.
 
-Le point le plus important est le suivant:
-notre benchmark ne teste pas seulement si la reponse sonne bien.
-Il teste si elle est reproductible, verifiable et factuellement ancree dans la source de donnees.
+## F2. Ce que le benchmark verifie exactement dans ce projet
 
-La limite, que nous assumons clairement,
-est que ce benchmark ne prouve pas zero hallucination semantique dans le texte explicatif.
-En revanche, il detecte tres bien l'hallucination fonctionnelle principale:
-inventer un produit ou un identifiant qui n'existe pas dans les resultats API.
+### Verification A: ancrage API (anti-invention)
 
-Donc, techniquement,
-notre systeme combine generation par LLM,
-controle deterministic,
-source de verite externe,
-et evaluation structuree par dataset et par KPI online."
+- Donnees connues: la liste api_products retournee par DummyJSON.
+- Sortie LLM: best_product_id.
+- Regle: provenance_ok = (best_product_id appartient aux ids de api_products).
+
+Interpretation:
+
+- True: la recommendation est ancree dans les resultats API.
+- False: la recommendation est non verifiable / hallucinee.
+
+### Verification B: adherence budget
+
+- On compare le prix recommande au budget utilisateur.
+- Dans le dashboard online, la regle est prix <= budget \* 1.3.
+- Dans le benchmark offline (dataset), la regle est intervalle attendu [min, max] par cas.
+
+### Verification C: coherence categorie (offline)
+
+- On compare la categorie du meilleur candidat au expected_category du dataset.
+
+## F3. Flux exact du benchmark online (GUI)
+
+1. L'utilisateur envoie une requete dans l'interface.
+2. Le systeme extrait les contraintes (product, budget, usage).
+3. Le systeme appelle l'API DummyJSON et recupere api_products.
+4. Le systeme applique le scoring local et produit ranked_products.
+5. Le LLM fournit une recommendation structuree avec best_product_id.
+6. La fonction record_to_benchmark ecrit une trace complete dans benchmark_results.json.
+7. Le dashboard relit ce fichier (polling) et recalcule les KPI.
+
+Important:
+le benchmark online ne stocke pas juste une note finale, il stocke tout le chemin de decision.
+
+## F4. Flux exact du benchmark offline (dataset)
+
+1. Charger dataset_dummyjson.json.
+2. Pour chaque exemple:
+   - extraire contraintes,
+   - appeler API,
+   - scorer,
+   - demander recommendation structuree,
+   - verifier provenance/categorie/budget,
+   - stocker resultat detaille.
+3. Calculer les taux globaux.
+4. Exporter un rapport JSON complet.
+
+Resultat:
+on peut rejouer les memes tests et comparer des versions du systeme.
+
+## F5. Ce que le benchmark PROUVE et ce qu'il NE PROUVE PAS
+
+### Ce qu'il prouve bien
+
+1. La recommendation finale cite bien (ou non) un produit present dans la source API.
+2. La logique de classement respecte des contraintes explicites (budget, tags, score).
+3. La qualite est mesurable dans le temps (dashboard) et sur dataset fixe (offline).
+
+### Ce qu'il ne prouve pas totalement
+
+1. Il ne prouve pas "zero hallucination semantique".
+   Exemple: id valide API, mais justification texte un peu exageree.
+2. Il ne prouve pas que "le LLM a lui-meme appele l'API".
+   Dans cette architecture, c'est le code Python qui appelle l'API, puis passe les resultats au LLM.
+3. Il ne garantit pas une couverture metier parfaite, car dataset encore petit.
+
+Message a dire au jury:
+"Notre benchmark prouve l'ancrage factuel de la recommendation via l'ID API, mais on reste transparents sur les limites: ce n'est pas une preuve mathematique de zero hallucination semantique."
+
+## F6. Reponse precise a "est-ce qu'on teste l'utilisation des APIs et outils souhaites?"
+
+Oui, mais avec un niveau de preuve specifique:
+
+1. Utilisation API DummyJSON:
+
+- Verifiee indirectement car on stocke api_products a chaque run.
+- Sans reponse API, pas d'IDs de reference pour provenance_ok.
+
+2. Utilisation des outils internes de pipeline:
+
+- Verifiee par la trace complete (constraints, api_products, ranked_products, recommendation).
+- On peut auditer chaque etape apres execution.
+
+3. Anti-invention:
+
+- Verifiee par provenance_ok (ID recommande present dans api_products).
+
+Formulation claire:
+"On ne demande pas au LLM d'inventer ou d'aller chercher seul. On lui fournit des candidats API et on valide son choix par verification d'ID."
+
+## F7. Explication code par code (ultra simple)
+
+### 1) preference_agent.py
+
+- Role: comprendre le texte utilisateur.
+- Sortie: UserConstraints.
+- Si LLM echoue: fallback regex.
+
+Ce que tu dis:
+"Ici, on transforme une phrase libre en donnees structurees pour le reste du pipeline."
+
+### 2) api_search_agent.py
+
+- Role: interroger DummyJSON.
+- Fait: detecte categorie ou lance une recherche texte.
+- Renvoie une liste standardisee de produits.
+
+Ce que tu dis:
+"Ici, on construit notre source de verite."
+
+### 3) search_agent.py
+
+- Role: filtrer et scorer localement.
+- Budget, tags, mots-clés, bonus prix.
+- Produit ranked_products.
+
+Ce que tu dis:
+"Ici, on garde une logique explicable et reproductible."
+
+### 4) recommendation_agent.py
+
+- Role: choisir le meilleur produit et expliquer.
+- Mode structure: impose best_product_id.
+
+Ce que tu dis:
+"Ici, on force un format qui permet la verification automatique."
+
+### 5) gui.py
+
+- Role: execution online + enregistrement benchmark.
+- record_to_benchmark ecrit la trace complete.
+
+Ce que tu dis:
+"Ici, chaque interaction devient une evidence exploitable."
+
+### 6) analytics_dashboard.py
+
+- Role: calcul KPI et tendances.
+- Lit benchmark_results.json en continu.
+
+Ce que tu dis:
+"Ici, on transforme les traces en pilotage qualite."
+
+### 7) benchmark_dummyjson.py
+
+- Role: benchmark offline reproductible.
+- Rejoue les exemples, calcule les taux, exporte rapport.
+
+Ce que tu dis:
+"Ici, on sort du mode demo et on passe en mode evaluation systematique."
+
+---
+
+## G) Script oral mot a mot (ta partie 4-5-6)
+
+Tu peux lire ce bloc exactement tel quel.
+
+"Je prends maintenant les points 4, 5 et 6: connaissances appliquees, outils hors cours, et evaluation.
+
+Sur les connaissances du cours, on a applique cinq principes.
+Premier principe: decomposition agentique.
+Au lieu d'un seul agent monolithique, on a separe extraction, appel API, scoring local, recommendation et evaluation.
+Ce choix rend le systeme lisible et surtout debuggable.
+
+Deuxieme principe: prompt engineering structure.
+On impose des sorties JSON au LLM.
+Ce n'est pas du confort, c'est ce qui permet des controles automatiques ensuite.
+
+Troisieme principe: grounding factuel.
+La recommendation n'est pas acceptee aveuglement.
+On la verifie contre la source DummyJSON avec la regle d'appartenance d'ID.
+
+Quatrieme principe: approche hybride.
+Le deterministic gere les regles metier et le ranking.
+Le generatif sert a comprendre la requete et expliquer la decision.
+
+Cinquieme principe: evaluation continue.
+Chaque execution est tracee, puis transformee en KPI.
+
+Sur les outils hors cours,
+on a utilise Gradio pour l'interface et le dashboard,
+DummyJSON comme source publique reproductible,
+matplotlib pour les tendances,
+et une journalisation JSON custom pour l'audit.
+
+Maintenant, comment la solution s'evalue.
+On a deux boucles.
+
+Premiere boucle, online:
+a chaque requete, on stocke contraintes, produits API, ranking, recommendation et statut de provenance.
+Le dashboard relit ces traces toutes les 5 secondes et recalcule les KPI.
+
+Deuxieme boucle, offline:
+on rejoue un dataset fixe,
+on calcule category match, budget respected et provenance,
+et on exporte un rapport complet.
+
+La metrique cle est provenance_ok.
+La regle est simple: l'ID recommande doit etre present dans les IDs retournes par l'API.
+Si ce n'est pas le cas, on detecte une recommendation non verifiable.
+
+Point important de rigueur:
+ce benchmark prouve bien l'ancrage factuel par ID,
+mais il ne prouve pas mathematiquement zero hallucination semantique.
+On est donc solides sur ce qu'on mesure, et transparents sur les limites.
+
+En conclusion,
+notre systeme ne se contente pas de recommander,
+il recommande de facon auditable, avec preuve de provenance et suivi de qualite."
+
+---
+
+## H) Mini version mot a mot (60 secondes)
+
+"Sur ma partie, l'essentiel est simple.
+On applique les concepts du cours avec une architecture multi-agent, des sorties JSON contraintes, et une verification de verite sur API.
+
+Les outils hors cours, comme Gradio, DummyJSON et matplotlib, servent a rendre la solution demonstrable et mesurable.
+
+L'evaluation combine online et offline.
+Online, chaque requete est tracee et convertie en KPI.
+Offline, un benchmark rejoue un dataset fixe et calcule des taux comparables.
+
+La metrique critique est provenance_ok:
+l'ID recommande doit etre dans les IDs API.
+Donc on mesure concretement le risque d'invention, et pas seulement la qualite percue."
