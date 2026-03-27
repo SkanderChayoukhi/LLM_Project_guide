@@ -433,14 +433,53 @@ on rejoue un dataset fixe,
 on calcule category match, budget respected et provenance,
 et on exporte un rapport complet.
 
+Je precise ici un point important techniquement: oui, le benchmark passe bien par un dataset.
+Ce dataset est un fichier JSON avec plusieurs exemples de test.
+Chaque exemple contient une requete utilisateur, une categorie attendue, et une plage de prix attendue.
+Cela veut dire qu'on ne fait pas une evaluation floue ou impressionniste.
+On rejoue des cas fixes, donc comparables et reproductibles.
+
+Le script de benchmark charge d'abord ce dataset,
+puis pour chaque exemple il relance exactement le vrai pipeline:
+extraction des contraintes,
+appel de l'API DummyJSON,
+filtrage et scoring locaux,
+recommendation structuree du LLM,
+puis verification.
+
+Ensuite, il compare plusieurs choses.
+Premiere comparaison: est-ce qu'on obtient au moins un candidat.
+Deuxieme comparaison: est-ce que la categorie du meilleur candidat correspond a la categorie attendue.
+Troisieme comparaison: est-ce que le prix du meilleur candidat tombe bien dans l'intervalle attendu du dataset.
+Quatrieme comparaison, la plus importante: est-ce que l'identifiant recommande par le LLM appartient bien aux identifiants des produits reellement retournes par l'API.
+
 La metrique cle est provenance_ok.
 La regle est simple: l'ID recommande doit etre present dans les IDs retournes par l'API.
 Si ce n'est pas le cas, on detecte une recommendation non verifiable.
+
+Autrement dit, on teste bien que le systeme s'appuie sur la source API comme source de verite,
+et qu'il n'invente pas un produit hors de cette source.
+
+Il faut aussi etre rigoureux sur ce que cela prouve exactement.
+Ce benchmark prouve tres bien l'ancrage factuel par identifiant produit.
+En revanche, il ne prouve pas mathematiquement zero hallucination semantique dans le texte explicatif du LLM.
+Il ne prouve pas non plus que le LLM a lui-meme appele l'API,
+car dans cette architecture c'est le code Python qui appelle DummyJSON, puis transmet les candidats au modele.
+Donc ce qu'on valide reellement, c'est que le systeme global utilise bien l'API comme source de verite et que le modele ne sort pas de cette source.
 
 Point important de rigueur:
 ce benchmark prouve bien l'ancrage factuel par ID,
 mais il ne prouve pas mathematiquement zero hallucination semantique.
 On est donc solides sur ce qu'on mesure, et transparents sur les limites.
+
+Si je relie maintenant cela au code,
+preference_agent.py extrait les contraintes sous forme structuree,
+api_search_agent.py appelle l'API DummyJSON et construit les api_products,
+search_agent.py applique les filtres et calcule le score local,
+recommendation_agent.py force une sortie JSON avec best_product_id,
+gui.py enregistre toute la trace online dans benchmark_results.json,
+analytics_dashboard.py relit cette trace et recalcule les KPI,
+et benchmark_dummyjson.py rejoue le pipeline complet sur le dataset pour mesurer category match, budget respected et provenance.
 
 En conclusion,
 notre systeme ne se contente pas de recommander,
