@@ -646,41 +646,141 @@ Chaque module a une responsabilite claire.
 
 ## Q3. Which knowledge from the course did you apply?
 
-Connaissances appliquees:
+Connaissances du cours appliquees, de facon concrete dans le code:
 
-- decomposition agentique (separation des roles),
-- prompt engineering structure (JSON-only, consignes explicites),
-- grounding des sorties sur donnees externes,
-- evaluation par metriques quantitatives,
-- observabilite de pipeline (traces stockees et dashboard).
+1. Decomposition agentique (separation des responsabilites)
+
+- Idee cours: eviter un agent unique qui fait tout.
+- Dans le projet:
+  - extraction: preference_agent.py,
+  - recherche source de verite: api_search_agent.py,
+  - filtrage/scoring deterministic: search_agent.py,
+  - generation de recommendation: recommendation_agent.py,
+  - monitoring/evaluation: gui.py + analytics_dashboard.py + benchmark_dummyjson.py.
+- Apport: debuggabilite et maintenabilite. Quand un resultat est mauvais, on sait dans quel bloc intervenir.
+
+2. Prompt engineering structure et sorties contraintes
+
+- Idee cours: si on veut automatiser, il faut imposer un format machine-readable.
+- Dans le projet:
+  - extract_constraints impose JSON strict avec 3 cles (product, budget, usage),
+  - build_recommendation_structured impose une sortie JSON avec best_product_id.
+- Apport: conversion facile en logique de verification et en metriques.
+
+3. Grounding / ancrage factuel
+
+- Idee cours: une sortie LLM doit etre ancree dans une source externe.
+- Dans le projet:
+  - DummyJSON est la source de verite,
+  - la recommendation est validee par appartenance de l'ID recommande aux IDs API.
+- Apport: reduction du risque d'hallucination.
+
+4. Combinaison heuristique + LLM
+
+- Idee cours: utiliser du deterministic pour le controle, du generatif pour l'explication.
+- Dans le projet:
+  - search_agent applique filtres et score explicables,
+  - recommendation_agent fournit la justification en langage naturel.
+- Apport: compromis qualite/controle.
+
+5. Evaluation continue et observabilite
+
+- Idee cours: mesurer en continu, pas seulement faire une demo qualitative.
+- Dans le projet:
+  - chaque requete GUI est loggee dans benchmark_results.json,
+  - dashboard recalcule les KPI en auto-refresh,
+  - benchmark batch hors-ligne sur dataset dedie.
+- Apport: pilotage par indicateurs, pas par impression.
 
 ## Q4. Did you need resources/tools not covered in the course?
 
-Oui:
+Oui, et leur role est precis:
 
-- Gradio pour l'interface et le dashboard web,
-- DummyJSON comme source externe de catalogue,
-- matplotlib pour visualiser les tendances,
-- mecanisme custom de benchmark continu.
+1. Gradio
+
+- Usage: UI utilisateur et dashboard analytics.
+- Pourquoi hors cours utile: permet une demo live et une boucle d'observation immediate.
+
+2. DummyJSON
+
+- Usage: catalogue produit public, endpoints search/category.
+- Pourquoi hors cours utile: fournit une base realiste et reproductible pour tester le grounding.
+
+3. Matplotlib
+
+- Usage: courbes de tendance (provenance et budget adherence).
+- Pourquoi hors cours utile: visualisation temporelle pour montrer l'evolution de la qualite.
+
+4. Instrumentation custom JSON
+
+- Usage: stockage structurre des traces de chaque requete (entree, candidats, recommendation, statut provenance).
+- Pourquoi hors cours utile: indispensable pour audit, debug et evaluation post-run.
+
+5. Lancement multi-process local (run_all.py)
+
+- Usage: lancer GUI + dashboard ensemble pour la soutenance.
+- Pourquoi hors cours utile: simplifie la demonstration end-to-end.
 
 ## Q5. How does your solution evaluate?
 
-Evaluation sur deux axes:
+Evaluation detaillee sur 2 boucles complementaires:
 
-1. En ligne (temps reel):
+1. Evaluation online (temps reel, en production de demo)
 
-- chaque requete est enregistree,
-- dashboard affiche provenance_rate, budget_adherence, api_coverage.
+Flux:
 
-2. Hors ligne (dataset):
+- utilisateur lance une requete dans GUI,
+- pipeline complet s'execute,
+- record_to_benchmark sauvegarde une entree complete,
+- analytics_dashboard relit le fichier et met a jour les KPI.
 
-- benchmark_dummyjson.py execute plusieurs cas,
-- calcule category_match, budget_respected, provenance_ok,
-- produit un rapport JSON detaille.
+Metriques online:
 
-Point cle:
+- provenance_rate = nombre de recommandations ancrees API / total requetes,
+- budget_adherence = taux de recommandations dont prix <= budget \* 1.3,
+- api_coverage = taux de requetes ayant au moins 1 produit API,
+- total_queries = nombre total d'interactions.
 
-- la metrique de provenance teste directement le risque d'hallucination.
+Interet:
+
+- montre la performance "en vie reelle" de l'application.
+
+2. Evaluation offline (benchmark sur dataset)
+
+Flux:
+
+- benchmark_dummyjson.py charge dataset_dummyjson.json,
+- execute tous les exemples,
+- calcule pour chaque exemple:
+  - presence de candidats,
+  - coherence categorie,
+  - respect budget,
+  - provenance recommendation,
+- exporte un rapport complet JSON.
+
+Metriques offline suivies:
+
+- with_at_least_one_candidate,
+- category_match_rate,
+- budget_respected_rate,
+- provenance_ok_rate.
+
+3. Logique de verification centrale (anti-hallucination)
+
+- Regle: provenance_ok = best_product_id in api_ids.
+- Interpretation:
+  - True: recommendation factuellement ancree,
+  - False: recommendation non verifiable ou hallucinee.
+
+4. Pourquoi cette evaluation est solide pedagogiquement
+
+- elle combine explicabilite (regles claires),
+- reproductibilite (dataset fixe),
+- et monitoring continu (dashboard).
+
+Point cle final:
+
+- la qualite n'est pas supposee, elle est mesuree sur traces.
 
 ---
 
